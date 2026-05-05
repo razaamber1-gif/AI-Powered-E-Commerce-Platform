@@ -1,0 +1,60 @@
+# docker-compose.yml — optional one-command startup for the whole stack.
+#
+# This is OPTIONAL. The recommended way to run the project is to start each
+# service manually (so you can see logs separately and restart them
+# independently — much easier for debugging during development).
+#
+# Use this only when you want to demo the project on a fresh machine without
+# installing Node, Python, or MongoDB locally:
+#   docker compose up
+#
+# Note: Ollama is NOT containerised here. You still need to install Ollama
+# on the host (https://ollama.com) and run `ollama serve` separately.
+
+version: "3.9"
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: shopzy_mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  ai-service:
+    build: ./ai-service
+    container_name: shopzy_ai
+    ports:
+      - "8000:8000"
+    environment:
+      # host.docker.internal lets the container reach Ollama running on the host
+      OLLAMA_HOST: http://host.docker.internal:11434
+      MODEL_NAME: llama3.2:3b
+
+  backend:
+    build: ./backend
+    container_name: shopzy_backend
+    ports:
+      - "5000:5000"
+    environment:
+      MONGO_URI: mongodb://mongo:27017/chatbot_search_product
+      JWT_SECRET: change_me_to_something_long_and_random
+      AI_SERVICE_URL: http://ai-service:8000
+      CLIENT_URL: http://localhost:3000
+    depends_on:
+      - mongo
+      - ai-service
+
+  frontend:
+    build: ./frontend
+    container_name: shopzy_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_URL: http://localhost:5000/api
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:
